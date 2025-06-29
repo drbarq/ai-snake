@@ -1,6 +1,97 @@
 import { Box, Typography, Paper } from "@mui/material";
+import { useGame } from "../contexts/GameContext";
+import { useEffect } from "react";
 
 export default function GameBoard() {
+  const { gameState, sendDirection } = useGame();
+
+  const cellSize = 20;
+  const gridWidth = gameState.grid_width;
+  const gridHeight = gameState.grid_height;
+
+  // Keyboard controls for manual mode
+  useEffect(() => {
+    const handleKeyPress = (event) => {
+      if (gameState.mode !== "manual") return;
+
+      switch (event.key) {
+        case "ArrowUp":
+        case "w":
+        case "W":
+          event.preventDefault();
+          sendDirection("UP");
+          break;
+        case "ArrowDown":
+        case "s":
+        case "S":
+          event.preventDefault();
+          sendDirection("DOWN");
+          break;
+        case "ArrowLeft":
+        case "a":
+        case "A":
+          event.preventDefault();
+          sendDirection("LEFT");
+          break;
+        case "ArrowRight":
+        case "d":
+        case "D":
+          event.preventDefault();
+          sendDirection("RIGHT");
+          break;
+        default:
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyPress);
+    return () => window.removeEventListener("keydown", handleKeyPress);
+  }, [gameState.mode, sendDirection]);
+
+  const renderSnake = () => {
+    return gameState.snake.map((segment, index) => (
+      <Box
+        key={index}
+        sx={{
+          position: "absolute",
+          width: cellSize - 2,
+          height: cellSize - 2,
+          left: segment[0] * cellSize + 1,
+          top: segment[1] * cellSize + 1,
+          background:
+            index === 0
+              ? "linear-gradient(45deg, #32D74B, #00FF88)"
+              : "linear-gradient(45deg, #00FF88, #32D74B)",
+          borderRadius: 1,
+          animation: `pulse ${2 + index * 0.1}s ease-in-out infinite`,
+          boxShadow: "0 0 10px rgba(50, 215, 75, 0.5)",
+          zIndex: 2,
+        }}
+      />
+    ));
+  };
+
+  const renderFood = () => {
+    if (!gameState.food) return null;
+
+    return (
+      <Box
+        sx={{
+          position: "absolute",
+          width: cellSize - 4,
+          height: cellSize - 4,
+          left: gameState.food[0] * cellSize + 2,
+          top: gameState.food[1] * cellSize + 2,
+          background: "linear-gradient(45deg, #FF6B35, #FF8C42)",
+          borderRadius: "50%",
+          animation: "pulse 1.5s ease-in-out infinite",
+          boxShadow: "0 0 15px rgba(255, 107, 53, 0.6)",
+          zIndex: 1,
+        }}
+      />
+    );
+  };
+
   return (
     <Paper
       elevation={0}
@@ -29,94 +120,83 @@ export default function GameBoard() {
         },
       }}
     >
-      {/* Grid lines */}
+      {/* Game grid container */}
       <Box
         sx={{
           position: "absolute",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "100%",
-          opacity: 0.1,
-          backgroundImage: `
-            linear-gradient(rgba(0, 212, 255, 0.3) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(0, 212, 255, 0.3) 1px, transparent 1px)
-          `,
-          backgroundSize: "40px 40px",
-          pointerEvents: "none",
-        }}
-      />
-
-      {/* Game content */}
-      <Box
-        sx={{
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          position: "relative",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%, -50%)",
+          width: gridWidth * cellSize,
+          height: gridHeight * cellSize,
+          border: "1px solid rgba(0, 212, 255, 0.2)",
+          borderRadius: 1,
+          background: "rgba(10, 20, 30, 0.7)",
           zIndex: 1,
         }}
       >
-        <Box sx={{ textAlign: "center" }}>
-          <Typography
-            variant="h3"
-            fontWeight="700"
-            color="white"
-            mb={2}
-            sx={{
-              textShadow: "0 0 10px #00D4FF",
-              "@media (max-width: 768px)": {
-                fontSize: "1.5rem",
-              },
-            }}
-          >
-            AI Snake Game
-          </Typography>
-
-          {/* Sample snake visualization */}
+        {/* Grid lines inside the play area */}
+        {[...Array(gridWidth + 1)].map((_, x) => (
           <Box
+            key={"v-" + x}
             sx={{
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              gap: 1,
-              mb: 3,
-            }}
-          >
-            {[...Array(5)].map((_, i) => (
-              <Box
-                key={i}
-                sx={{
-                  width: "20px",
-                  height: "20px",
-                  background: "linear-gradient(45deg, #32D74B, #00FF88)",
-                  borderRadius: 1,
-                  animation: `pulse ${2 + i * 0.2}s ease-in-out infinite`,
-                  boxShadow: "0 0 10px rgba(50, 215, 75, 0.5)",
-                }}
-              />
-            ))}
-          </Box>
-
-          {/* Food element */}
-          <Box
-            sx={{
-              width: "16px",
-              height: "16px",
-              background: "linear-gradient(45deg, #FF6B35, #FF8C42)",
-              borderRadius: "50%",
-              mx: "auto",
-              animation: "pulse 1.5s ease-in-out infinite",
-              boxShadow: "0 0 15px rgba(255, 107, 53, 0.6)",
+              position: "absolute",
+              left: x * cellSize,
+              top: 0,
+              width: x === gridWidth ? 1 : 2,
+              height: gridHeight * cellSize,
+              bgcolor: "rgba(0, 212, 255, 0.5)",
+              opacity: 0.7,
+              pointerEvents: "none",
             }}
           />
+        ))}
+        {[...Array(gridHeight + 1)].map((_, y) => (
+          <Box
+            key={"h-" + y}
+            sx={{
+              position: "absolute",
+              top: y * cellSize,
+              left: 0,
+              width: gridWidth * cellSize,
+              height: y === gridHeight ? 1 : 2,
+              bgcolor: "rgba(0, 212, 255, 0.5)",
+              opacity: 0.7,
+              pointerEvents: "none",
+            }}
+          />
+        ))}
+        {renderSnake()}
+        {renderFood()}
+      </Box>
 
-          <Typography variant="body2" color="gray.400" mt={2} fontWeight="500">
-            Ready to play
+      {/* Game info overlay */}
+      <Box
+        sx={{
+          position: "absolute",
+          top: 10,
+          left: 10,
+          zIndex: 3,
+        }}
+      >
+        <Typography variant="body2" color="white" fontWeight="600">
+          Mode: {gameState.mode.toUpperCase()}
+        </Typography>
+        {gameState.training && (
+          <Typography variant="body2" color="#00FF88" fontWeight="600">
+            Training: {gameState.current_episode}/{gameState.target_episodes}
           </Typography>
-        </Box>
+        )}
+        {gameState.mode === "manual" && (
+          <Typography
+            variant="caption"
+            color="gray.400"
+            display="block"
+            mt={0.5}
+          >
+            Use WASD or Arrow Keys
+          </Typography>
+        )}
       </Box>
 
       {/* Corner accents */}

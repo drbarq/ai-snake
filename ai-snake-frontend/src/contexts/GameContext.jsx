@@ -79,6 +79,10 @@ export const GameProvider = ({ children }) => {
     WebSocketService.pauseTraining();
   };
 
+  const startRound = () => {
+    WebSocketService.startRound();
+  };
+
   const toggleMode = () => {
     WebSocketService.toggleMode();
   };
@@ -100,6 +104,7 @@ export const GameProvider = ({ children }) => {
     updateTrainingRounds,
     startTraining,
     pauseTraining,
+    startRound,
     toggleMode,
     resetGame,
     sendDirection,

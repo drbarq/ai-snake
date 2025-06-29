@@ -14,9 +14,7 @@ import json
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from src.game.game_engine import GameEngine
-from src.game.snake import Direction
 from src.ai.agent import DQNAgent
-from src.ui.dashboard import Dashboard
 
 app = FastAPI()
 
@@ -91,18 +89,31 @@ def get_game_state():
 
 # --- Command Handling ---
 async def handle_command(cmd):
-    global ai_mode, training_mode, target_episodes, current_episode, episode_scores, manual_direction, game_engine, all_scores
+    global ai_mode, training_mode, target_episodes, current_episode
+    global episode_scores, manual_direction, game_engine, all_scores
     action = cmd.get('action')
+    print(f"Received command: {action}")
     if action == 'toggle_mode':
         ai_mode = not ai_mode
+        print(f"AI mode: {ai_mode}")
     elif action == 'start_training':
         training_mode = True
         ai_mode = True
         current_episode = 0
         episode_scores = []
+        print("Started training mode")
     elif action == 'pause_training':
         training_mode = False
         ai_mode = False
+        print("Paused training mode")
+    elif action == 'start_round':
+        # Start a manual round - the snake will move when direction is sent
+        ai_mode = False
+        training_mode = False
+        game_engine.reset()
+        # Set initial direction to get the snake moving
+        manual_direction = 'RIGHT'
+        print("Started manual round with initial direction RIGHT")
     elif action == 'set_grid':
         w = int(cmd.get('width', 15))
         h = int(cmd.get('height', 17))
@@ -111,21 +122,26 @@ async def handle_command(cmd):
             current_episode = 0
             episode_scores = []
             all_scores = []
+            print(f"Set grid to {w}x{h}")
     elif action == 'set_training_rounds':
         target_episodes = int(cmd.get('rounds', DEFAULT_TRAINING_ROUNDS))
+        print(f"Set training rounds to {target_episodes}")
     elif action == 'manual_direction':
         d = cmd.get('direction')
         if d in ['UP', 'DOWN', 'LEFT', 'RIGHT']:
             manual_direction = d
+            print(f"Set manual direction to {d}")
     elif action == 'reset':
         all_scores.append(game_engine.score)
         game_engine.reset()
         current_episode = 0
+        print("Reset game")
     # Add more commands as needed
 
 # --- Game Loop ---
 async def game_loop():
-    global ai_mode, training_mode, current_episode, episode_scores, manual_direction, all_scores
+    global ai_mode, training_mode, current_episode, episode_scores
+    global manual_direction, all_scores
     while True:
         # Only move if in AI, training, or manual mode
         move_snake = False
@@ -163,6 +179,7 @@ async def game_loop():
                     next_state = game_engine.get_state_for_ai()
                     agent.remember(state, action, reward, next_state, False)
             elif manual_direction:
+                print(f"Moving snake in direction: {manual_direction}")
                 game_engine.change_direction(manual_direction)
                 game_engine.move_snake()
                 if game_engine.check_food_collision():

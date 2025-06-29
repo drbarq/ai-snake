@@ -88,6 +88,10 @@ class WebSocketService {
     this.sendCommand({ action: "pause_training" });
   }
 
+  startRound() {
+    this.sendCommand({ action: "start_round" });
+  }
+
   setGrid(width, height) {
     this.sendCommand({ action: "set_grid", width, height });
   }
