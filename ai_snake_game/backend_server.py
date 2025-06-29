@@ -79,6 +79,7 @@ def get_game_state():
         'training': training_mode,
         'current_episode': current_episode,
         'target_episodes': target_episodes,
+        'game_over': game_engine.is_game_over(),
         'stats': {
             'all_scores': all_scores,
             'best': max(all_scores) if all_scores else 0,
@@ -119,6 +120,7 @@ async def handle_command(cmd, ws=None):
         h = int(cmd.get('height', 17))
         if w > 3 and h > 3:
             game_engine = GameEngine(w, h, CELL_SIZE)
+            game_engine.game_over = True  # Ensure game is stopped after grid change
             current_episode = 0
             episode_scores = []
             all_scores = []
@@ -210,7 +212,8 @@ async def game_loop():
                         if current_episode >= target_episodes:
                             training_mode = False
                             ai_mode = False
-                    game_engine.reset()
+                        game_engine.reset()  # Only reset in training mode
+                    # In manual/AI mode, do NOT reset here; just set game_over
                 else:
                     reward = 1 if game_engine.check_food_collision() else 0
                     next_state = game_engine.get_state_for_ai()
@@ -224,7 +227,7 @@ async def game_loop():
                     game_engine.spawn_food()
                 if game_engine.is_game_over():
                     all_scores.append(game_engine.score)
-                    game_engine.reset()
+                    # Do NOT reset in manual mode; just set game_over
         # Broadcast state to all clients
         state_json = json.dumps(get_game_state())
         for ws in set(clients):

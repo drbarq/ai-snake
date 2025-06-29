@@ -92,6 +92,9 @@ export default function GameBoard() {
     );
   };
 
+  // Game Over overlay
+  const showGameOver = gameState.game_over && !gameState.training;
+
   return (
     <Paper
       elevation={0}
@@ -168,6 +171,34 @@ export default function GameBoard() {
         ))}
         {renderSnake()}
         {renderFood()}
+        {/* Game Over Overlay */}
+        {showGameOver && (
+          <Box
+            sx={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              bgcolor: "rgba(0,0,0,0.7)",
+              zIndex: 10,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Typography variant="h3" color="#FF6B35" fontWeight="bold" mb={2}>
+              GAME OVER
+            </Typography>
+            <Typography variant="h5" color="white" mb={2}>
+              Score: {gameState.score}
+            </Typography>
+            <Typography variant="body1" color="gray.300">
+              Click "START ROUND" to play again
+            </Typography>
+          </Box>
+        )}
       </Box>
 
       {/* Game info overlay */}
