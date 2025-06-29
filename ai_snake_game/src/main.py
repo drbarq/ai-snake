@@ -1,7 +1,7 @@
 import pygame
-from src.game.game_engine import GameEngine
-from src.game.snake import Direction
-from ai_snake_game.src.game.renderer import ModernRenderer
+from game.game_engine import GameEngine
+from game.snake import Direction
+from game.renderer import ModernRenderer
 
 def main():
     pygame.init()
