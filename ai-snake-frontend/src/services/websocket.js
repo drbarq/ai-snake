@@ -81,6 +81,7 @@ class WebSocketService {
   }
 
   setMode(mode) {
+    console.log(`WebSocket: Sending setMode command for mode: ${mode}`);
     this.sendCommand({ action: "set_mode", mode });
   }
 

@@ -33,11 +33,9 @@ export default function Dashboard({ children }) {
     evaluationResult,
     modelSaveInfo,
     updateTrainingRounds,
-    startTraining,
   } = useGame();
 
   // UI state
-  const [mode, setModeState] = useState(gameState.mode);
   const [gridWidth, setGridWidth] = useState(gridSize.width.toString());
   const [gridHeight, setGridHeight] = useState(gridSize.height.toString());
   const [speed, setSpeed] = useState("100"); // Placeholder for speed
@@ -52,16 +50,17 @@ export default function Dashboard({ children }) {
   React.useEffect(() => {
     if (evaluationResult) setOpenEval(true);
   }, [evaluationResult]);
-  React.useEffect(() => {
-    setModeState(gameState.mode);
-  }, [gameState.mode]);
 
   // Handlers
   const handleModeChange = (e) => {
     const newMode = e.target.value;
+    console.log(
+      `Mode change requested: ${newMode}, current game state mode: ${gameState.mode}`
+    );
     if (newMode !== gameState.mode) {
       if (newMode === "training") {
         // For training mode, we need to start training
+        console.log("Setting training mode...");
         if (trainingRoundsValid) {
           updateTrainingRounds(parseInt(trainingRoundsInput));
           setMode("training");
@@ -72,22 +71,16 @@ export default function Dashboard({ children }) {
         }
       } else {
         // For manual and AI modes, set mode directly
+        console.log(`Setting mode to: ${newMode}`);
         setMode(newMode);
       }
     }
-    setModeState(newMode);
   };
   const handleTrainingRoundsChange = (e) => {
     const val = e.target.value;
     setTrainingRoundsInput(val);
     const num = parseInt(val);
     setTrainingRoundsValid(!isNaN(num) && num > 0);
-  };
-  const handleStartTraining = () => {
-    if (trainingRoundsValid) {
-      updateTrainingRounds(parseInt(trainingRoundsInput));
-      startTraining();
-    }
   };
   const handleGridApply = () => {
     const width = parseInt(gridWidth);
@@ -98,9 +91,9 @@ export default function Dashboard({ children }) {
   };
 
   // Controls state
-  const isManual = mode === "manual";
-  const isAI = mode === "ai";
-  const isTraining = mode === "training";
+  const isManual = gameState.mode === "manual";
+  const isAI = gameState.mode === "ai";
+  const isTraining = gameState.mode === "training";
   const isGameOver = gameState.game_over;
   const canStart = isManual || isAI; // Both manual and AI modes need manual start
   const canPause = isTraining;
@@ -137,7 +130,7 @@ export default function Dashboard({ children }) {
               <InputLabel id="mode-select-label">Mode</InputLabel>
               <Select
                 labelId="mode-select-label"
-                value={mode}
+                value={gameState.mode}
                 label="Mode"
                 onChange={handleModeChange}
                 size="small"
@@ -242,6 +235,17 @@ export default function Dashboard({ children }) {
             >
               Apply
             </Button>
+            {!isTraining && (
+              <TextField
+                size="small"
+                label="Training Rounds"
+                value={trainingRoundsInput}
+                onChange={handleTrainingRoundsChange}
+                sx={{ width: 100, height: 40 }}
+                type="number"
+                inputProps={{ min: 1 }}
+              />
+            )}
             <TextField
               size="small"
               label="Speed"

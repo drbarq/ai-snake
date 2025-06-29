@@ -49,6 +49,7 @@ export const GameProvider = ({ children }) => {
       } else if (data.type === "save_model") {
         setModelSaveInfo(data);
       } else {
+        console.log("Received game state:", data);
         setGameState(data);
       }
     });

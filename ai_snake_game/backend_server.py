@@ -111,6 +111,7 @@ async def handle_command(cmd, ws=None):
     elif action == 'set_mode':
         # Set mode directly
         mode = cmd.get('mode', 'manual')
+        print(f"Setting mode to: {mode}")
         if mode == 'training':
             training_mode = True
             ai_mode = True
@@ -126,7 +127,7 @@ async def handle_command(cmd, ws=None):
             training_mode = False
             ai_mode = False
             print("Set to manual mode")
-        print(f"Mode set to: {mode}")
+        print(f"Mode set to: {mode} - AI: {ai_mode}, Training: {training_mode}")
     elif action == 'start_training':
         training_mode = True
         ai_mode = True
