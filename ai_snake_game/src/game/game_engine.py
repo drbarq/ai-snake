@@ -127,4 +127,72 @@ class GameEngine:
 
     def get_snake_length(self) -> int:
         """Return current snake length."""
-        return self.snake.length 
+        return self.snake.length
+
+    def get_state_for_ai(self) -> list:
+        """Return state vector for AI processing."""
+        # Create a simple state vector for the AI
+        head_x, head_y = self.snake.head
+        food_x, food_y = self.food.get_position()
+        
+        # Direction one-hot encoding
+        direction = self.snake.direction
+        dir_up = 1 if direction == Direction.UP else 0
+        dir_down = 1 if direction == Direction.DOWN else 0
+        dir_left = 1 if direction == Direction.LEFT else 0
+        dir_right = 1 if direction == Direction.RIGHT else 0
+        
+        # Danger detection (simplified)
+        danger_straight = 0
+        danger_right = 0
+        danger_left = 0
+        
+        # Food direction
+        food_up = 1 if food_y < head_y else 0
+        food_down = 1 if food_y > head_y else 0
+        food_left = 1 if food_x < head_x else 0
+        food_right = 1 if food_x > head_x else 0
+        
+        return [
+            dir_up, dir_down, dir_left, dir_right,
+            danger_straight, danger_right, danger_left,
+            food_up, food_down, food_left, food_right
+        ]
+
+    def change_direction(self, direction_str: str) -> None:
+        """Change snake direction using string input."""
+        direction_map = {
+            'UP': Direction.UP,
+            'DOWN': Direction.DOWN,
+            'LEFT': Direction.LEFT,
+            'RIGHT': Direction.RIGHT
+        }
+        if direction_str in direction_map:
+            self.snake.change_direction(direction_map[direction_str])
+
+    def move_snake(self) -> None:
+        """Move the snake in its current direction."""
+        if not self.game_over:
+            self.snake.move()
+            self.steps += 1
+            
+            # Check for collisions
+            if self.snake.check_collision(self.grid_width, self.grid_height):
+                self.game_over = True
+
+    def check_food_collision(self) -> bool:
+        """Check if snake head collides with food."""
+        return self.food.is_eaten(self.snake.head)
+
+    def eat_food(self) -> None:
+        """Handle food consumption."""
+        self.snake.grow()
+        self.score += 1
+
+    def spawn_food(self) -> None:
+        """Generate new food."""
+        try:
+            self.food.generate_new_food(self.snake.get_body_positions())
+        except ValueError:
+            # Game won - no more space for food
+            self.game_over = True 

@@ -63,6 +63,11 @@ class Snake:
         new_dx, new_dy = new_direction.value
         return (current_dx, current_dy) != (-new_dx, -new_dy)
 
+    def change_direction(self, new_direction: Direction) -> None:
+        """Change snake direction if valid."""
+        if self._is_valid_direction(new_direction):
+            self.direction = new_direction
+
     def grow(self) -> None:
         """Mark snake for growth on next move."""
         self.grow_pending = True

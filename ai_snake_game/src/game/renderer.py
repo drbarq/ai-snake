@@ -1,5 +1,7 @@
 import pygame
 from typing import Optional
+from .game_engine import GameEngine
+
 
 class ModernRenderer:
     def __init__(self, screen: pygame.Surface, cell_size: int = 30):
@@ -7,6 +9,13 @@ class ModernRenderer:
         self.cell_size = cell_size
         self.grid_offset_x = 50
         self.grid_offset_y = 50
+
+    def render(self, game_engine: GameEngine):
+        """Render the game engine state."""
+        self.screen.fill((10, 10, 10))
+        self.render_grid(game_engine.grid_width, game_engine.grid_height)
+        self.render_food(game_engine.food)
+        self.render_snake(game_engine.snake)
 
     def render_frame(self, game_state, ai_overlay: Optional[dict] = None):
         self.screen.fill((10, 10, 10))
@@ -20,12 +29,14 @@ class ModernRenderer:
             pygame.draw.line(
                 self.screen, color,
                 (self.grid_offset_x + x * self.cell_size, self.grid_offset_y),
-                (self.grid_offset_x + x * self.cell_size, self.grid_offset_y + grid_height * self.cell_size), 1)
+                (self.grid_offset_x + x * self.cell_size, 
+                 self.grid_offset_y + grid_height * self.cell_size), 1)
         for y in range(grid_height + 1):
             pygame.draw.line(
                 self.screen, color,
                 (self.grid_offset_x, self.grid_offset_y + y * self.cell_size),
-                (self.grid_offset_x + grid_width * self.cell_size, self.grid_offset_y + y * self.cell_size), 1)
+                (self.grid_offset_x + grid_width * self.cell_size, 
+                 self.grid_offset_y + y * self.cell_size), 1)
 
     def render_snake(self, snake):
         for i, (x, y) in enumerate(snake.positions):
