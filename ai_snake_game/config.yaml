@@ -1,0 +1,60 @@
+# Game Configuration
+game:
+  grid_width: 20
+  grid_height: 20
+  cell_size: 30
+  fps: 60
+  initial_snake_length: 3
+
+# AI Training Configuration
+ai:
+  # Network Architecture
+  network_type: "FeatureDQN" # GridDQN, FeatureDQN, VisionDQN, HybridDQN
+  hidden_layers: [256, 128]
+  activation: "relu"
+
+  # Training Parameters
+  learning_rate: 0.001
+  batch_size: 32
+  memory_size: 50000
+  epsilon_start: 1.0
+  epsilon_end: 0.01
+  epsilon_decay: 0.995
+  target_update_frequency: 1000
+
+  # Input Processing
+  input_type: "features" # grid, features, vision, hybrid
+  feature_config:
+    danger_detection: true
+    food_vector: true
+    wall_distances: true
+    body_awareness: true
+    movement_state: true
+
+  vision_config:
+    ray_count: 8
+    ray_length: 10
+    detect_layers: ["walls", "body", "food"]
+
+# Visual Configuration
+visual:
+  theme: "neon_cyber" # neon_cyber, retro_arcade, minimal_clean
+  effects:
+    smooth_movement: true
+    particle_effects: true
+    glow_effects: true
+    animations: true
+
+  ui:
+    show_dashboard: true
+    show_ai_overlay: true
+    show_controls: true
+    dashboard_position: "right"
+
+# Training Configuration
+training:
+  max_episodes: 10000
+  save_frequency: 1000
+  evaluation_frequency: 500
+  early_stopping_patience: 2000
+  target_score: 100
