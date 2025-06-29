@@ -80,7 +80,8 @@ function App() {
           </Box>
 
           <Container
-            maxWidth="xl"
+            maxWidth={false}
+            disableGutters
             sx={{
               position: "relative",
               zIndex: 2,
@@ -92,18 +93,11 @@ function App() {
             }}
           >
             <Box
-              sx={{
-                display: "flex",
-                gap: 4,
-                alignItems: "center",
-                justifyContent: "center",
-                maxWidth: "1400px",
-                width: "100%",
-                flexWrap: { xs: "wrap", lg: "nowrap" },
-              }}
+              sx={{ width: "100%", display: "flex", justifyContent: "center" }}
             >
-              <GameBoard />
-              <Dashboard />
+              <Dashboard>
+                <GameBoard />
+              </Dashboard>
             </Box>
           </Container>
         </Box>
