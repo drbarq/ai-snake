@@ -1,5 +1,5 @@
 import pygame
-from game.game_engine import GameEngine
+from gamr
 from game.snake import Direction
 from game.renderer import ModernRenderer
 
