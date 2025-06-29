@@ -61,9 +61,10 @@ training_stats = {
     'epsilon': agent.epsilon
 }
 all_scores = []
-manual_direction = None
+manual_direction = 'RIGHT'  # Default direction
 
 # --- Game State Serialization ---
+
 def get_game_state():
     return {
         'snake': game_engine.snake.get_body_positions(),
@@ -88,6 +89,7 @@ def get_game_state():
     }
 
 # --- Command Handling ---
+
 async def handle_command(cmd, ws=None):
     global ai_mode, training_mode, target_episodes, current_episode
     global episode_scores, manual_direction, game_engine, all_scores
@@ -110,7 +112,7 @@ async def handle_command(cmd, ws=None):
         ai_mode = False
         training_mode = False
         game_engine.reset()
-        manual_direction = 'RIGHT'
+        manual_direction = 'RIGHT'  # Reset to default
         print("Started manual round with initial direction RIGHT")
     elif action == 'set_grid':
         w = int(cmd.get('width', 15))
@@ -174,16 +176,16 @@ async def handle_command(cmd, ws=None):
     # Add more commands as needed
 
 # --- Game Loop ---
+
 async def game_loop():
     global ai_mode, training_mode, current_episode, episode_scores
     global manual_direction, all_scores
     while True:
-        # Only move if in AI, training, or manual mode
         move_snake = False
         if training_mode or ai_mode:
             move_snake = True
-        elif manual_direction:
-            move_snake = True
+        elif not ai_mode and not training_mode:
+            move_snake = True  # Always move in manual mode
         if move_snake:
             if ai_mode or training_mode:
                 state = game_engine.get_state_for_ai()
@@ -213,8 +215,8 @@ async def game_loop():
                     reward = 1 if game_engine.check_food_collision() else 0
                     next_state = game_engine.get_state_for_ai()
                     agent.remember(state, action, reward, next_state, False)
-            elif manual_direction:
-                print(f"Moving snake in direction: {manual_direction}")
+            else:
+                # Manual mode: always move in the last direction
                 game_engine.change_direction(manual_direction)
                 game_engine.move_snake()
                 if game_engine.check_food_collision():
@@ -223,7 +225,6 @@ async def game_loop():
                 if game_engine.is_game_over():
                     all_scores.append(game_engine.score)
                     game_engine.reset()
-                manual_direction = None
         # Broadcast state to all clients
         state_json = json.dumps(get_game_state())
         for ws in set(clients):
