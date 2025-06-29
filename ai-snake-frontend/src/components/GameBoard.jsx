@@ -195,7 +195,9 @@ export default function GameBoard() {
               Score: {gameState.score}
             </Typography>
             <Typography variant="body1" color="gray.300">
-              Click "START ROUND" to play again
+              {gameState.mode === "ai"
+                ? "Click 'START AI ROUND' to watch another AI game"
+                : "Click 'START ROUND' to play again"}
             </Typography>
           </Box>
         )}
@@ -226,6 +228,26 @@ export default function GameBoard() {
             mt={0.5}
           >
             Use WASD or Arrow Keys
+          </Typography>
+        )}
+        {gameState.mode === "ai" && (
+          <Typography
+            variant="caption"
+            color="gray.400"
+            display="block"
+            mt={0.5}
+          >
+            AI Controlled - Click Start to Watch
+          </Typography>
+        )}
+        {gameState.mode === "training" && (
+          <Typography
+            variant="caption"
+            color="gray.400"
+            display="block"
+            mt={0.5}
+          >
+            Auto-training in Progress
           </Typography>
         )}
       </Box>

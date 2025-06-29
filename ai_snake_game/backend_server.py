@@ -66,6 +66,7 @@ manual_direction = 'RIGHT'  # Default direction
 # --- Game State Serialization ---
 
 def get_game_state():
+    mode = 'training' if training_mode else ('ai' if ai_mode else 'manual')
     return {
         'snake': game_engine.snake.get_body_positions(),
         'food': game_engine.food.get_position(),
@@ -73,9 +74,7 @@ def get_game_state():
         'steps': game_engine.steps,
         'grid_width': game_engine.grid_width,
         'grid_height': game_engine.grid_height,
-        'mode': (
-            'training' if training_mode else ('ai' if ai_mode else 'manual')
-        ),
+        'mode': mode,
         'training': training_mode,
         'current_episode': current_episode,
         'target_episodes': target_episodes,
@@ -97,30 +96,62 @@ async def handle_command(cmd, ws=None):
     action = cmd.get('action')
     print(f"Received command: {action}")
     if action == 'toggle_mode':
-        ai_mode = not ai_mode
-        print(f"AI mode: {ai_mode}")
+        # Toggle between manual and AI modes (training is separate)
+        if training_mode:
+            # If in training, stop training and go to manual
+            training_mode = False
+            ai_mode = False
+        elif ai_mode:
+            # If in AI mode, go to manual
+            ai_mode = False
+        else:
+            # If in manual, go to AI mode
+            ai_mode = True
+        print(f"Mode changed - AI: {ai_mode}, Training: {training_mode}")
+    elif action == 'set_mode':
+        # Set mode directly
+        mode = cmd.get('mode', 'manual')
+        if mode == 'training':
+            training_mode = True
+            ai_mode = True
+            current_episode = 0
+            episode_scores = []
+            game_engine.reset()  # Start training immediately
+            print("Started training mode")
+        elif mode == 'ai':
+            training_mode = False
+            ai_mode = True
+            print("Set to AI mode")
+        elif mode == 'manual':
+            training_mode = False
+            ai_mode = False
+            print("Set to manual mode")
+        print(f"Mode set to: {mode}")
     elif action == 'start_training':
         training_mode = True
         ai_mode = True
         current_episode = 0
         episode_scores = []
+        game_engine.reset()  # Start training immediately
         print("Started training mode")
     elif action == 'pause_training':
         training_mode = False
         ai_mode = False
         print("Paused training mode")
     elif action == 'start_round':
-        ai_mode = False
-        training_mode = False
+        # Start a new round in current mode
         game_engine.reset()
         manual_direction = 'RIGHT'  # Reset to default
-        print("Started manual round with initial direction RIGHT")
+        mode_str = ('training' if training_mode else
+                   ('ai' if ai_mode else 'manual'))
+        print(f"Started round in mode: {mode_str}")
     elif action == 'set_grid':
         w = int(cmd.get('width', 15))
         h = int(cmd.get('height', 17))
         if w > 3 and h > 3:
             game_engine = GameEngine(w, h, CELL_SIZE)
-            game_engine.game_over = True  # Ensure game is stopped after grid change
+            # Ensure game is stopped after grid change
+            game_engine.game_over = True
             current_episode = 0
             episode_scores = []
             all_scores = []
@@ -183,13 +214,23 @@ async def game_loop():
     global ai_mode, training_mode, current_episode, episode_scores
     global manual_direction, all_scores
     while True:
-        move_snake = False
-        if training_mode or ai_mode:
-            move_snake = True
-        elif not ai_mode and not training_mode:
-            move_snake = True  # Always move in manual mode
-        if move_snake:
+        # Determine if we should move the snake
+        should_move = False
+        
+        if training_mode:
+            # Training mode: always move, auto-restart on game over
+            should_move = True
+        elif ai_mode and not game_engine.is_game_over():
+            # AI mode: move only if game is not over
+            should_move = True
+        elif (not ai_mode and not training_mode and
+              not game_engine.is_game_over()):
+            # Manual mode: move only if game is not over
+            should_move = True
+            
+        if should_move:
             if ai_mode or training_mode:
+                # AI/Training mode logic
                 state = game_engine.get_state_for_ai()
                 action = agent.act(state)
                 directions = ['UP', 'DOWN', 'LEFT', 'RIGHT']
@@ -212,14 +253,18 @@ async def game_loop():
                         if current_episode >= target_episodes:
                             training_mode = False
                             ai_mode = False
-                        game_engine.reset()  # Only reset in training mode
-                    # In manual/AI mode, do NOT reset here; just set game_over
+                            print("Training completed!")
+                        else:
+                            # Auto-restart in training mode
+                            game_engine.reset()
+                    # In AI mode, do NOT reset - let game stay over until
+                    # user clicks start
                 else:
                     reward = 1 if game_engine.check_food_collision() else 0
                     next_state = game_engine.get_state_for_ai()
                     agent.remember(state, action, reward, next_state, False)
             else:
-                # Manual mode: always move in the last direction
+                # Manual mode logic
                 game_engine.change_direction(manual_direction)
                 game_engine.move_snake()
                 if game_engine.check_food_collision():
@@ -227,7 +272,9 @@ async def game_loop():
                     game_engine.spawn_food()
                 if game_engine.is_game_over():
                     all_scores.append(game_engine.score)
-                    # Do NOT reset in manual mode; just set game_over
+                    # Do NOT reset in manual mode - let game stay over until
+                    # user clicks start
+                    
         # Broadcast state to all clients
         state_json = json.dumps(get_game_state())
         for ws in set(clients):

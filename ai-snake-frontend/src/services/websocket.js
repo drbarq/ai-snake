@@ -80,6 +80,10 @@ class WebSocketService {
     this.sendCommand({ action: "toggle_mode" });
   }
 
+  setMode(mode) {
+    this.sendCommand({ action: "set_mode", mode });
+  }
+
   startTraining() {
     this.sendCommand({ action: "start_training" });
   }

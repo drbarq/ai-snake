@@ -26,7 +26,7 @@ export default function Dashboard({ children }) {
     updateGridSize,
     pauseTraining,
     startRound,
-    toggleMode,
+    setMode,
     resetGame,
     saveModel,
     evaluateModel,
@@ -37,7 +37,7 @@ export default function Dashboard({ children }) {
   } = useGame();
 
   // UI state
-  const [mode, setMode] = useState(gameState.mode);
+  const [mode, setModeState] = useState(gameState.mode);
   const [gridWidth, setGridWidth] = useState(gridSize.width.toString());
   const [gridHeight, setGridHeight] = useState(gridSize.height.toString());
   const [speed, setSpeed] = useState("100"); // Placeholder for speed
@@ -53,16 +53,29 @@ export default function Dashboard({ children }) {
     if (evaluationResult) setOpenEval(true);
   }, [evaluationResult]);
   React.useEffect(() => {
-    setMode(gameState.mode);
+    setModeState(gameState.mode);
   }, [gameState.mode]);
 
   // Handlers
   const handleModeChange = (e) => {
     const newMode = e.target.value;
     if (newMode !== gameState.mode) {
-      toggleMode();
+      if (newMode === "training") {
+        // For training mode, we need to start training
+        if (trainingRoundsValid) {
+          updateTrainingRounds(parseInt(trainingRoundsInput));
+          setMode("training");
+        } else {
+          // If training rounds not set, set a default and start
+          updateTrainingRounds(100);
+          setMode("training");
+        }
+      } else {
+        // For manual and AI modes, set mode directly
+        setMode(newMode);
+      }
     }
-    setMode(newMode);
+    setModeState(newMode);
   };
   const handleTrainingRoundsChange = (e) => {
     const val = e.target.value;
@@ -89,7 +102,7 @@ export default function Dashboard({ children }) {
   const isAI = mode === "ai";
   const isTraining = mode === "training";
   const isGameOver = gameState.game_over;
-  const canStart = isManual || isAI;
+  const canStart = isManual || isAI; // Both manual and AI modes need manual start
   const canPause = isTraining;
   const canReset = true;
 
@@ -139,25 +152,13 @@ export default function Dashboard({ children }) {
             {/* Controls */}
             {isTraining ? (
               <Stack direction="row" spacing={1} alignItems="center">
-                <TextField
-                  size="small"
-                  label="Rounds"
-                  value={trainingRoundsInput}
-                  onChange={handleTrainingRoundsChange}
-                  sx={{ width: 80, height: 40 }}
-                  type="number"
-                  inputProps={{ min: 1 }}
-                />
-                <Button
-                  variant="contained"
-                  color="success"
-                  onClick={handleStartTraining}
-                  disabled={!trainingRoundsValid}
-                  size="small"
-                  sx={{ height: 40 }}
+                <Typography
+                  variant="body2"
+                  color="success.main"
+                  fontWeight="600"
                 >
-                  Start Training
-                </Button>
+                  Training Active
+                </Typography>
                 <Button
                   onClick={pauseTraining}
                   color="warning"
@@ -190,7 +191,7 @@ export default function Dashboard({ children }) {
                   size="small"
                   sx={{ height: 40 }}
                 >
-                  Start
+                  {isAI ? "Start AI Round" : "Start Round"}
                 </Button>
                 <Button
                   onClick={pauseTraining}
