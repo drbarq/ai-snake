@@ -107,6 +107,14 @@ class WebSocketService {
   resetGame() {
     this.sendCommand({ action: "reset" });
   }
+
+  saveModel() {
+    this.sendCommand({ action: "save_model" });
+  }
+
+  evaluateModel(episodes = 20) {
+    this.sendCommand({ action: "evaluate_model", episodes });
+  }
 }
 
 export default new WebSocketService();

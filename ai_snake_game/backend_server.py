@@ -88,7 +88,7 @@ def get_game_state():
     }
 
 # --- Command Handling ---
-async def handle_command(cmd):
+async def handle_command(cmd, ws=None):
     global ai_mode, training_mode, target_episodes, current_episode
     global episode_scores, manual_direction, game_engine, all_scores
     action = cmd.get('action')
@@ -107,11 +107,9 @@ async def handle_command(cmd):
         ai_mode = False
         print("Paused training mode")
     elif action == 'start_round':
-        # Start a manual round - the snake will move when direction is sent
         ai_mode = False
         training_mode = False
         game_engine.reset()
-        # Set initial direction to get the snake moving
         manual_direction = 'RIGHT'
         print("Started manual round with initial direction RIGHT")
     elif action == 'set_grid':
@@ -136,6 +134,43 @@ async def handle_command(cmd):
         game_engine.reset()
         current_episode = 0
         print("Reset game")
+    elif action == 'save_model':
+        # Save model with episode info
+        filename = f'dqn_snake_ep{current_episode}.pth'
+        agent.save_model(filename)
+        print(f"Model saved as {filename}")
+        if ws:
+            await ws.send_text(json.dumps({
+                "type": "save_model",
+                "filename": filename
+            }))
+    elif action == 'evaluate_model':
+        # Evaluate model for 20 episodes with epsilon=0
+        eval_episodes = int(cmd.get('episodes', 20))
+        scores = []
+        orig_epsilon = agent.epsilon
+        for _ in range(eval_episodes):
+            game_engine.reset()
+            while not game_engine.is_game_over():
+                state = game_engine.get_state_for_ai()
+                action = agent.act(state, epsilon=0.0)
+                directions = ['UP', 'DOWN', 'LEFT', 'RIGHT']
+                direction = directions[action]
+                game_engine.change_direction(direction)
+                game_engine.move_snake()
+                if game_engine.check_food_collision():
+                    game_engine.eat_food()
+                    game_engine.spawn_food()
+            scores.append(game_engine.score)
+        agent.epsilon = orig_epsilon
+        avg_score = sum(scores) / len(scores) if scores else 0
+        print(f"Evaluation complete. Avg score: {avg_score}")
+        if ws:
+            await ws.send_text(json.dumps({
+                "type": "evaluation_result",
+                "avg_score": avg_score,
+                "scores": scores
+            }))
     # Add more commands as needed
 
 # --- Game Loop ---
@@ -211,8 +246,8 @@ async def websocket_endpoint(websocket: WebSocket):
             data = await websocket.receive_text()
             try:
                 cmd = json.loads(data)
-                await handle_command(cmd)
-            except Exception:
-                pass
+                await handle_command(cmd, ws=websocket)
+            except Exception as e:
+                print(f"Error handling command: {e}")
     except WebSocketDisconnect:
         clients.remove(websocket) 

@@ -35,6 +35,8 @@ export const GameProvider = ({ children }) => {
   const [gridSize, setGridSize] = useState({ width: 15, height: 17 });
   const [trainingRounds, setTrainingRounds] = useState(100);
   const [isConnected, setIsConnected] = useState(false);
+  const [evaluationResult, setEvaluationResult] = useState(null);
+  const [modelSaveInfo, setModelSaveInfo] = useState(null);
 
   useEffect(() => {
     // Connect to WebSocket
@@ -42,7 +44,13 @@ export const GameProvider = ({ children }) => {
 
     // Set up message handler
     WebSocketService.onMessage((data) => {
-      setGameState(data);
+      if (data.type === "evaluation_result") {
+        setEvaluationResult(data);
+      } else if (data.type === "save_model") {
+        setModelSaveInfo(data);
+      } else {
+        setGameState(data);
+      }
     });
 
     // Cleanup on unmount
@@ -95,6 +103,14 @@ export const GameProvider = ({ children }) => {
     WebSocketService.sendDirection(direction);
   };
 
+  const saveModel = () => {
+    WebSocketService.saveModel();
+  };
+
+  const evaluateModel = (episodes = 20) => {
+    WebSocketService.evaluateModel(episodes);
+  };
+
   const value = {
     gameState,
     gridSize,
@@ -108,6 +124,10 @@ export const GameProvider = ({ children }) => {
     toggleMode,
     resetGame,
     sendDirection,
+    saveModel,
+    evaluateModel,
+    evaluationResult,
+    modelSaveInfo,
   };
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;

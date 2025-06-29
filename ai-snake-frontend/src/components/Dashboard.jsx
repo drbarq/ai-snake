@@ -11,6 +11,8 @@ import {
   Alert,
 } from "@mui/material";
 import { useGame } from "../contexts/GameContext";
+import Snackbar from "@mui/material/Snackbar";
+import MuiAlert from "@mui/material/Alert";
 
 export default function Dashboard() {
   const {
@@ -25,11 +27,26 @@ export default function Dashboard() {
     startRound,
     toggleMode,
     resetGame,
+    saveModel,
+    evaluateModel,
+    evaluationResult,
+    modelSaveInfo,
   } = useGame();
 
   const [gridWidth, setGridWidth] = useState(gridSize.width.toString());
   const [gridHeight, setGridHeight] = useState(gridSize.height.toString());
   const [rounds, setRounds] = useState(trainingRounds.toString());
+
+  // Snackbar state
+  const [openSave, setOpenSave] = useState(false);
+  const [openEval, setOpenEval] = useState(false);
+
+  React.useEffect(() => {
+    if (modelSaveInfo) setOpenSave(true);
+  }, [modelSaveInfo]);
+  React.useEffect(() => {
+    if (evaluationResult) setOpenEval(true);
+  }, [evaluationResult]);
 
   const handleGridApply = () => {
     const width = parseInt(gridWidth);
@@ -466,6 +483,28 @@ export default function Dashboard() {
         </Paper>
       </Box>
 
+      {/* Save/Evaluate Buttons */}
+      <Stack direction="row" spacing={2} width="100%" justifyContent="center">
+        <Button variant="outlined" color="info" onClick={saveModel}>
+          Save Model
+        </Button>
+        <Button
+          variant="outlined"
+          color="secondary"
+          onClick={() => evaluateModel(20)}
+        >
+          Evaluate AI
+        </Button>
+      </Stack>
+
+      {/* Show evaluation result */}
+      {evaluationResult && (
+        <Alert severity="info" sx={{ mt: 2, width: "100%" }}>
+          Evaluation: Avg Score = {evaluationResult.avg_score.toFixed(2)} (over{" "}
+          {evaluationResult.scores.length} games)
+        </Alert>
+      )}
+
       {/* Reset Button */}
       <Button
         fullWidth
@@ -477,6 +516,38 @@ export default function Dashboard() {
       >
         RESET GAME
       </Button>
+
+      {/* Snackbar for model save */}
+      <Snackbar
+        open={openSave}
+        autoHideDuration={4000}
+        onClose={() => setOpenSave(false)}
+      >
+        <MuiAlert
+          elevation={6}
+          variant="filled"
+          severity="success"
+          sx={{ width: "100%" }}
+        >
+          Model saved as {modelSaveInfo?.filename}
+        </MuiAlert>
+      </Snackbar>
+      {/* Snackbar for evaluation */}
+      <Snackbar
+        open={openEval}
+        autoHideDuration={4000}
+        onClose={() => setOpenEval(false)}
+      >
+        <MuiAlert
+          elevation={6}
+          variant="filled"
+          severity="info"
+          sx={{ width: "100%" }}
+        >
+          Evaluation complete! Avg Score:{" "}
+          {evaluationResult?.avg_score?.toFixed(2)}
+        </MuiAlert>
+      </Snackbar>
     </Paper>
   );
 }
