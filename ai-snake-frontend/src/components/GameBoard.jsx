@@ -1,9 +1,19 @@
-import { Box, Typography, Paper } from "@mui/material";
+import React, { useEffect, useState } from "react";
+import { Box, Typography, Paper, LinearProgress, Stack } from "@mui/material";
 import { useGame } from "../contexts/GameContext";
-import { useEffect } from "react";
 
 export default function GameBoard() {
   const { gameState, sendDirection } = useGame();
+  const [showCompletionCelebration, setShowCompletionCelebration] = useState(false);
+  
+  // Check for training completion
+  useEffect(() => {
+    if (gameState.current_episode >= gameState.target_episodes && gameState.target_episodes > 0) {
+      setShowCompletionCelebration(true);
+      const timer = setTimeout(() => setShowCompletionCelebration(false), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [gameState.current_episode, gameState.target_episodes]);
 
   const cellSize = 20;
   const gridWidth = gameState.grid_width;
@@ -171,6 +181,48 @@ export default function GameBoard() {
         ))}
         {renderSnake()}
         {renderFood()}
+        {/* Training Completion Celebration */}
+        {showCompletionCelebration && (
+          <Box
+            sx={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              bgcolor: "rgba(0, 255, 136, 0.1)",
+              zIndex: 15,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              animation: "pulse 2s ease-in-out infinite"
+            }}
+          >
+            <Typography 
+              variant="h2" 
+              sx={{
+                background: "linear-gradient(45deg, #00FF88, #00D4FF)",
+                backgroundClip: "text",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                fontWeight: "700",
+                mb: 2,
+                textAlign: "center",
+                animation: "pulse 1.5s ease-in-out infinite"
+              }}
+            >
+              🎉 TRAINING COMPLETE! 🎉
+            </Typography>
+            <Typography variant="h5" color="white" fontWeight="600" sx={{ mb: 1 }}>
+              {gameState.current_episode} Episodes Finished
+            </Typography>
+            <Typography variant="body1" color="#00FF88" fontWeight="500">
+              Best Score: {gameState.stats?.best || 0} | Avg: {Math.round(gameState.stats?.avg || 0)}
+            </Typography>
+          </Box>
+        )}
+        
         {/* Game Over Overlay */}
         {showGameOver && (
           <Box
@@ -215,10 +267,41 @@ export default function GameBoard() {
         <Typography variant="body2" color="white" fontWeight="600">
           Mode: {gameState.mode.toUpperCase()}
         </Typography>
-        {gameState.training && (
-          <Typography variant="body2" color="#00FF88" fontWeight="600">
-            Training: {gameState.current_episode}/{gameState.target_episodes}
-          </Typography>
+        {(gameState.training || gameState.training_paused) && (
+          <Stack spacing={1} sx={{ mt: 1, minWidth: 180 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="body2" color="#00FF88" fontWeight="600">
+                Episode: {gameState.current_episode || 0}/{gameState.target_episodes || 100}
+              </Typography>
+              <Typography variant="caption" color="white" fontWeight="500">
+                {Math.round(((gameState.current_episode || 0) / (gameState.target_episodes || 100)) * 100)}%
+              </Typography>
+            </Box>
+            <LinearProgress 
+              variant="determinate" 
+              value={((gameState.current_episode || 0) / (gameState.target_episodes || 100)) * 100}
+              sx={{
+                height: 4,
+                borderRadius: 2,
+                backgroundColor: 'rgba(0, 255, 136, 0.3)',
+                '& .MuiLinearProgress-bar': {
+                  borderRadius: 2,
+                  background: 'linear-gradient(90deg, #00FF88, #00D4FF)',
+                  boxShadow: '0 0 10px rgba(0, 255, 136, 0.5)'
+                }
+              }}
+            />
+            {gameState.training && (
+              <Typography variant="caption" color="#00FF88" sx={{ textAlign: 'center', fontSize: '0.7rem' }}>
+                ⚡ Training Active
+              </Typography>
+            )}
+            {gameState.training_paused && (
+              <Typography variant="caption" color="#FF9800" sx={{ textAlign: 'center', fontSize: '0.7rem' }}>
+                ⏸️ Training Paused
+              </Typography>
+            )}
+          </Stack>
         )}
         {gameState.mode === "manual" && (
           <Typography

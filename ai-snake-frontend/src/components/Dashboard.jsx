@@ -40,6 +40,7 @@ export default function Dashboard({ children }) {
     listModels,
     availableModels,
     modelLoadInfo,
+    resumeTraining,
   } = useGame();
 
   // UI state
@@ -105,23 +106,26 @@ export default function Dashboard({ children }) {
     const num = parseInt(val);
     setTrainingRoundsValid(!isNaN(num) && num > 0);
   };
-  const handleGridApply = () => {
-    const width = parseInt(gridWidth);
-    const height = parseInt(gridHeight);
-    if (width > 3 && height > 3) {
-      updateGridSize(width, height);
-    }
-  };
-
   // Controls state
   const isManual = gameState.mode === "manual";
   const isAI = gameState.mode === "ai";
   const isTraining = gameState.mode === "training";
+  const isTrainingPaused = gameState.training_paused || false;
   const isGameOver = gameState.game_over;
   const canStart = (isManual || isAI) && isGameOver; // Can only start new round when game is over
   const canPause = isTraining;
+  const canResume = isTrainingPaused;
   const canReset = true;
   const isGameActive = !isGameOver && !isTraining;
+  const canChangeGrid = isGameOver && !isTraining && !isTrainingPaused;
+
+  const handleGridApply = () => {
+    const width = parseInt(gridWidth);
+    const height = parseInt(gridHeight);
+    if (width > 3 && height > 3 && canChangeGrid) {
+      updateGridSize(width, height);
+    }
+  };
 
   const panelWidth = 600;
   return (
@@ -197,15 +201,26 @@ export default function Dashboard({ children }) {
               <InputLabel id="mode-select-label">Mode</InputLabel>
               <Select
                 labelId="mode-select-label"
-                value={gameState.mode}
+                value={isTrainingPaused ? "paused" : gameState.mode}
                 label="Mode"
                 onChange={handleModeChange}
                 size="small"
-                sx={{ height: 40 }}
+                disabled={isTraining || isTrainingPaused}
+                sx={{ 
+                  height: 40,
+                  '& .MuiSelect-select': {
+                    color: isTrainingPaused ? '#FF9800' : 'inherit'
+                  }
+                }}
               >
                 <MenuItem value="manual">Manual</MenuItem>
                 <MenuItem value="ai">AI</MenuItem>
                 <MenuItem value="training">Training</MenuItem>
+                {isTrainingPaused && (
+                  <MenuItem value="paused" disabled>
+                    Training Paused
+                  </MenuItem>
+                )}
               </Select>
             </FormControl>
 
@@ -254,6 +269,66 @@ export default function Dashboard({ children }) {
                   }}
                 >
                   Pause
+                </Button>
+                <Button
+                  onClick={resetGame}
+                  color="error"
+                  variant="contained"
+                  size="small"
+                  sx={{ 
+                    height: 40,
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    borderRadius: 2
+                  }}
+                >
+                  Reset
+                </Button>
+              </Stack>
+            ) : isTrainingPaused ? (
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    px: 2,
+                    py: 1,
+                    backgroundColor: 'warning.main',
+                    borderRadius: 2,
+                    color: 'white'
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      backgroundColor: 'white',
+                      animation: 'pulse 2s ease-in-out infinite'
+                    }}
+                  />
+                  <Typography
+                    variant="body2"
+                    fontWeight="600"
+                    sx={{ textTransform: 'none' }}
+                  >
+                    Training Paused
+                  </Typography>
+                </Box>
+                <Button
+                  onClick={resumeTraining}
+                  color="success"
+                  variant="contained"
+                  size="small"
+                  sx={{ 
+                    height: 40,
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    borderRadius: 2
+                  }}
+                >
+                  Resume Training
                 </Button>
                 <Button
                   onClick={resetGame}
@@ -330,8 +405,14 @@ export default function Dashboard({ children }) {
               label="W"
               value={gridWidth}
               onChange={(e) => setGridWidth(e.target.value)}
-              sx={{ width: 50, height: 40 }}
+              disabled={!canChangeGrid}
+              sx={{ 
+                width: 50, 
+                height: 40,
+                opacity: canChangeGrid ? 1 : 0.6
+              }}
               inputProps={{ min: 4 }}
+              title={!canChangeGrid ? "Grid can only be changed when game is over" : ""}
             />
             <Typography sx={{ px: 0.5 }}>x</Typography>
             <TextField
@@ -339,17 +420,43 @@ export default function Dashboard({ children }) {
               label="H"
               value={gridHeight}
               onChange={(e) => setGridHeight(e.target.value)}
-              sx={{ width: 50, height: 40 }}
+              disabled={!canChangeGrid}
+              sx={{ 
+                width: 50, 
+                height: 40,
+                opacity: canChangeGrid ? 1 : 0.6
+              }}
               inputProps={{ min: 4 }}
+              title={!canChangeGrid ? "Grid can only be changed when game is over" : ""}
             />
             <Button
               size="small"
               variant="outlined"
               onClick={handleGridApply}
-              sx={{ height: 40 }}
+              disabled={!canChangeGrid}
+              sx={{ 
+                height: 40,
+                opacity: canChangeGrid ? 1 : 0.6
+              }}
+              title={!canChangeGrid ? "Grid can only be changed when game is over" : ""}
             >
               Apply
             </Button>
+            {!canChangeGrid && (
+              <Typography 
+                variant="caption" 
+                color="warning.main" 
+                sx={{ 
+                  fontSize: '0.7rem',
+                  fontStyle: 'italic',
+                  maxWidth: 80,
+                  textAlign: 'center',
+                  lineHeight: 1.2
+                }}
+              >
+                Grid locked during gameplay
+              </Typography>
+            )}
             {!isTraining && (
               <TextField
                 size="small"
