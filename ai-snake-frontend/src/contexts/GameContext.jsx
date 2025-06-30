@@ -37,6 +37,10 @@ export const GameProvider = ({ children }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [evaluationResult, setEvaluationResult] = useState(null);
   const [modelSaveInfo, setModelSaveInfo] = useState(null);
+  const [connectionError, setConnectionError] = useState(null);
+  const [reconnectAttempts, setReconnectAttempts] = useState(0);
+  const [availableModels, setAvailableModels] = useState([]);
+  const [modelLoadInfo, setModelLoadInfo] = useState(null);
 
   useEffect(() => {
     // Connect to WebSocket
@@ -44,14 +48,36 @@ export const GameProvider = ({ children }) => {
 
     // Set up message handler
     WebSocketService.onMessage((data) => {
-      if (data.type === "evaluation_result") {
-        setEvaluationResult(data);
-      } else if (data.type === "save_model") {
-        setModelSaveInfo(data);
-      } else {
-        console.log("Received game state:", data);
-        setGameState(data);
+      try {
+        if (data.type === "evaluation_result") {
+          setEvaluationResult(data);
+        } else if (data.type === "save_model") {
+          setModelSaveInfo(data);
+        } else if (data.type === "load_model") {
+          setModelLoadInfo(data);
+        } else if (data.type === "list_models") {
+          setAvailableModels(data.files || []);
+        } else {
+          console.log("Received game state:", data);
+          setGameState(data);
+          setConnectionError(null); // Clear any previous errors
+        }
+      } catch (error) {
+        console.error('Error processing WebSocket message:', error);
+        setConnectionError(error.message);
       }
+    });
+
+    // Set up error handler
+    WebSocketService.onError((error) => {
+      console.error('WebSocket error:', error);
+      setConnectionError('Connection error occurred');
+    });
+
+    // Set up close handler
+    WebSocketService.onClose(() => {
+      setIsConnected(false);
+      setReconnectAttempts(prev => prev + 1);
     });
 
     // Cleanup on unmount
@@ -88,6 +114,10 @@ export const GameProvider = ({ children }) => {
     WebSocketService.pauseTraining();
   };
 
+  const resumeTraining = () => {
+    WebSocketService.resumeTraining();
+  };
+
   const startRound = () => {
     WebSocketService.startRound();
   };
@@ -116,6 +146,18 @@ export const GameProvider = ({ children }) => {
     WebSocketService.evaluateModel(episodes);
   };
 
+  const setSpeed = (speed) => {
+    WebSocketService.setSpeed(speed);
+  };
+
+  const loadModel = (filename) => {
+    WebSocketService.loadModel(filename);
+  };
+
+  const listModels = () => {
+    WebSocketService.listModels();
+  };
+
   const value = {
     gameState,
     gridSize,
@@ -134,6 +176,14 @@ export const GameProvider = ({ children }) => {
     evaluateModel,
     evaluationResult,
     modelSaveInfo,
+    connectionError,
+    reconnectAttempts,
+    setSpeed,
+    loadModel,
+    listModels,
+    availableModels,
+    modelLoadInfo,
+    resumeTraining,
   };
 
   return <GameContext.Provider value={value}>{children}</GameContext.Provider>;

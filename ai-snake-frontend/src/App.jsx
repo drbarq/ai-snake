@@ -2,6 +2,7 @@ import { ThemeProvider, createTheme } from "@mui/material/styles";
 import { CssBaseline, Box, Container } from "@mui/material";
 import GameBoard from "./components/GameBoard";
 import Dashboard from "./components/Dashboard";
+import ErrorBoundary from "./components/ErrorBoundary";
 import { GameProvider } from "./contexts/GameContext";
 import "./App.css";
 
@@ -31,9 +32,10 @@ const theme = createTheme({
 
 function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <GameProvider>
+    <ErrorBoundary>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <GameProvider>
         <Box
           className="particle-bg"
           sx={{
@@ -101,8 +103,9 @@ function App() {
             </Box>
           </Container>
         </Box>
-      </GameProvider>
-    </ThemeProvider>
+        </GameProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 

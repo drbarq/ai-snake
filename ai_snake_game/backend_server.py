@@ -51,6 +51,7 @@ agent = DQNAgent(11, 4, agent_config)
 # Game state
 ai_mode = False
 training_mode = False
+training_paused = False  # Track if training is paused
 target_episodes = DEFAULT_TRAINING_ROUNDS
 current_episode = 0
 episode_scores = []
@@ -62,8 +63,20 @@ training_stats = {
 }
 all_scores = []
 manual_direction = 'RIGHT'  # Default direction
+game_speed = 100  # Default speed (milliseconds between moves)
+training_losses = []  # Track training losses
+episode_steps = []  # Track steps per episode
+win_rate_history = []  # Track win rate over time
 
 # --- Game State Serialization ---
+
+def calculate_win_rate():
+    """Calculate win rate based on recent scores (score > 5 considered a win)"""
+    if len(all_scores) < 10:
+        return 0.0
+    recent_scores = all_scores[-20:]  # Last 20 games
+    wins = sum(1 for score in recent_scores if score > 5)
+    return wins / len(recent_scores) * 100
 
 def get_game_state():
     mode = 'training' if training_mode else ('ai' if ai_mode else 'manual')
@@ -76,6 +89,7 @@ def get_game_state():
         'grid_height': game_engine.grid_height,
         'mode': mode,
         'training': training_mode,
+        'training_paused': training_paused,
         'current_episode': current_episode,
         'target_episodes': target_episodes,
         'game_over': game_engine.is_game_over(),
@@ -84,7 +98,11 @@ def get_game_state():
             'best': max(all_scores) if all_scores else 0,
             'avg': sum(all_scores) / len(all_scores) if all_scores else 0,
             'last': all_scores[-1] if all_scores else 0,
-            'epsilon': agent.epsilon
+            'epsilon': agent.epsilon,
+            'training_losses': training_losses[-50:],  # Last 50 loss values
+            'episode_steps': episode_steps[-50:],  # Last 50 episode step counts
+            'win_rate': calculate_win_rate(),
+            'episodes_completed': current_episode
         }
     }
 
@@ -136,9 +154,22 @@ async def handle_command(cmd, ws=None):
         game_engine.reset()  # Start training immediately
         print("Started training mode")
     elif action == 'pause_training':
-        training_mode = False
-        ai_mode = False
-        print("Paused training mode")
+        if training_mode:
+            training_paused = True
+            training_mode = False
+            ai_mode = False
+            print("Paused training mode")
+        else:
+            print("No active training to pause")
+    elif action == 'resume_training':
+        if training_paused:
+            training_paused = False
+            training_mode = True
+            ai_mode = True
+            game_engine.reset()  # Start fresh game
+            print(f"Resumed training at episode {current_episode}")
+        else:
+            print("No paused training to resume")
     elif action == 'start_round':
         # Start a new round in current mode
         game_engine.reset()
@@ -165,6 +196,12 @@ async def handle_command(cmd, ws=None):
         if d in ['UP', 'DOWN', 'LEFT', 'RIGHT']:
             manual_direction = d
             print(f"Set manual direction to {d}")
+    elif action == 'set_speed':
+        speed = int(cmd.get('speed', 100))
+        if 10 <= speed <= 1000:  # Valid range: 10ms to 1000ms
+            global game_speed
+            game_speed = speed
+            print(f"Set game speed to {speed}ms")
     elif action == 'reset':
         all_scores.append(game_engine.score)
         game_engine.reset()
@@ -180,6 +217,27 @@ async def handle_command(cmd, ws=None):
                 "type": "save_model",
                 "filename": filename
             }))
+    elif action == 'load_model':
+        # Load model from file
+        filename = cmd.get('filename', 'dqn_snake_ep41.pth')
+        try:
+            agent.load_model(filename)
+            print(f"Model loaded from {filename}")
+            if ws:
+                await ws.send_text(json.dumps({
+                    "type": "load_model",
+                    "filename": filename,
+                    "success": True
+                }))
+        except Exception as e:
+            print(f"Failed to load model {filename}: {e}")
+            if ws:
+                await ws.send_text(json.dumps({
+                    "type": "load_model",
+                    "filename": filename,
+                    "success": False,
+                    "error": str(e)
+                }))
     elif action == 'evaluate_model':
         # Evaluate model for 20 episodes with epsilon=0
         eval_episodes = int(cmd.get('episodes', 20))
@@ -207,6 +265,28 @@ async def handle_command(cmd, ws=None):
                 "avg_score": avg_score,
                 "scores": scores
             }))
+    elif action == 'list_models':
+        # List available model files
+        import os
+        model_files = []
+        try:
+            for file in os.listdir('.'):
+                if file.endswith('.pth'):
+                    model_files.append(file)
+            print(f"Found model files: {model_files}")
+            if ws:
+                await ws.send_text(json.dumps({
+                    "type": "list_models",
+                    "files": model_files
+                }))
+        except Exception as e:
+            print(f"Failed to list models: {e}")
+            if ws:
+                await ws.send_text(json.dumps({
+                    "type": "list_models",
+                    "files": [],
+                    "error": str(e)
+                }))
     # Add more commands as needed
 
 # --- Game Loop ---
@@ -246,8 +326,11 @@ async def game_loop():
                     next_state = game_engine.get_state_for_ai()
                     agent.remember(state, action, reward, next_state, True)
                     if len(agent.memory) > 32:
-                        agent.replay()
+                        loss = agent.replay()
+                        if loss is not None:
+                            training_losses.append(loss)
                     all_scores.append(game_engine.score)
+                    episode_steps.append(game_engine.steps)
                     if training_mode:
                         episode_scores.append(game_engine.score)
                         current_episode += 1
@@ -261,9 +344,14 @@ async def game_loop():
                     # In AI mode, do NOT reset - let game stay over until
                     # user clicks start
                 else:
-                    reward = 1 if game_engine.check_food_collision() else 0
+                    reward = 10 if game_engine.check_food_collision() else -0.1
                     next_state = game_engine.get_state_for_ai()
                     agent.remember(state, action, reward, next_state, False)
+                    # Train periodically during gameplay for better learning
+                    if len(agent.memory) > 32 and game_engine.steps % 10 == 0:
+                        loss = agent.replay()
+                        if loss is not None:
+                            training_losses.append(loss)
             else:
                 # Manual mode logic
                 game_engine.change_direction(manual_direction)
@@ -283,7 +371,8 @@ async def game_loop():
                 await ws.send_text(state_json)
             except Exception:
                 clients.remove(ws)
-        await asyncio.sleep(0.1)
+        # Use dynamic speed based on game_speed setting
+        await asyncio.sleep(game_speed / 1000.0)
 
 @app.on_event("startup")
 async def startup_event():

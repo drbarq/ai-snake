@@ -18,6 +18,7 @@ import {
 } from "@mui/material";
 import MuiAlert from "@mui/material/Alert";
 import { useGame } from "../contexts/GameContext";
+import TrainingCharts from "./TrainingCharts";
 
 export default function Dashboard({ children }) {
   const {
@@ -33,16 +34,24 @@ export default function Dashboard({ children }) {
     evaluationResult,
     modelSaveInfo,
     updateTrainingRounds,
+    isConnected,
+    setSpeed,
+    loadModel,
+    listModels,
+    availableModels,
+    modelLoadInfo,
   } = useGame();
 
   // UI state
   const [gridWidth, setGridWidth] = useState(gridSize.width.toString());
   const [gridHeight, setGridHeight] = useState(gridSize.height.toString());
-  const [speed, setSpeed] = useState("100"); // Placeholder for speed
+  const [speed, setSpeedState] = useState("100"); // Game speed in milliseconds
   const [openSave, setOpenSave] = useState(false);
   const [openEval, setOpenEval] = useState(false);
   const [trainingRoundsInput, setTrainingRoundsInput] = useState("");
   const [trainingRoundsValid, setTrainingRoundsValid] = useState(false);
+  const [selectedModel, setSelectedModel] = useState("");
+  const [openLoadSnackbar, setOpenLoadSnackbar] = useState(false);
 
   React.useEffect(() => {
     if (modelSaveInfo) setOpenSave(true);
@@ -50,6 +59,20 @@ export default function Dashboard({ children }) {
   React.useEffect(() => {
     if (evaluationResult) setOpenEval(true);
   }, [evaluationResult]);
+  React.useEffect(() => {
+    if (modelLoadInfo) setOpenLoadSnackbar(true);
+  }, [modelLoadInfo]);
+  
+  // Load available models after connection is established
+  React.useEffect(() => {
+    if (isConnected) {
+      // Delay the initial commands to ensure connection is stable
+      const timer = setTimeout(() => {
+        listModels();
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [isConnected, listModels]);
 
   // Handlers
   const handleModeChange = (e) => {
@@ -95,9 +118,10 @@ export default function Dashboard({ children }) {
   const isAI = gameState.mode === "ai";
   const isTraining = gameState.mode === "training";
   const isGameOver = gameState.game_over;
-  const canStart = isManual || isAI; // Both manual and AI modes need manual start
+  const canStart = (isManual || isAI) && isGameOver; // Can only start new round when game is over
   const canPause = isTraining;
   const canReset = true;
+  const isGameActive = !isGameOver && !isTraining;
 
   const panelWidth = 600;
   return (
@@ -106,14 +130,57 @@ export default function Dashboard({ children }) {
       spacing={3}
       sx={{ width: "100%", alignItems: "center", mt: 4 }}
     >
+      {/* Connection Status Indicator */}
+      <Box
+        sx={{
+          position: "fixed",
+          top: 16,
+          right: 16,
+          zIndex: 1000,
+          display: "flex",
+          alignItems: "center",
+          gap: 1,
+          px: 2,
+          py: 1,
+          borderRadius: 3,
+          backgroundColor: isConnected 
+            ? "rgba(76, 175, 80, 0.9)" 
+            : "rgba(244, 67, 54, 0.9)",
+          backdropFilter: "blur(10px)",
+          boxShadow: "0 4px 12px rgba(0, 0, 0, 0.3)",
+          border: `1px solid ${isConnected ? '#4CAF50' : '#F44336'}`
+        }}
+      >
+        <Box
+          sx={{
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            backgroundColor: "white",
+            animation: isConnected ? "pulse 2s ease-in-out infinite" : "none"
+          }}
+        />
+        <Typography
+          variant="caption"
+          color="white"
+          fontWeight="600"
+          sx={{ textTransform: "uppercase", letterSpacing: 0.5 }}
+        >
+          {isConnected ? "Connected" : "Connecting..."}
+        </Typography>
+      </Box>
       {/* Top Panel: Mode Dropdown, Controls, Settings */}
       <Paper
-        elevation={2}
+        elevation={3}
         sx={{
-          p: 2,
-          borderRadius: 3,
+          p: 3,
+          borderRadius: 4,
           mx: "auto",
           overflow: "visible",
+          background: "linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)",
+          backdropFilter: "blur(10px)",
+          border: "1px solid rgba(0, 212, 255, 0.2)",
+          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3)"
         }}
       >
         <Stack
@@ -144,20 +211,47 @@ export default function Dashboard({ children }) {
 
             {/* Controls */}
             {isTraining ? (
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Typography
-                  variant="body2"
-                  color="success.main"
-                  fontWeight="600"
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1,
+                    px: 2,
+                    py: 1,
+                    backgroundColor: 'success.main',
+                    borderRadius: 2,
+                    color: 'white'
+                  }}
                 >
-                  Training Active
-                </Typography>
+                  <Box
+                    sx={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      backgroundColor: 'white',
+                      animation: 'pulse 1s ease-in-out infinite'
+                    }}
+                  />
+                  <Typography
+                    variant="body2"
+                    fontWeight="600"
+                    sx={{ textTransform: 'none' }}
+                  >
+                    Training Active
+                  </Typography>
+                </Box>
                 <Button
                   onClick={pauseTraining}
                   color="warning"
                   variant="contained"
                   size="small"
-                  sx={{ height: 40 }}
+                  sx={{ 
+                    height: 40,
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    borderRadius: 2
+                  }}
                 >
                   Pause
                 </Button>
@@ -166,7 +260,12 @@ export default function Dashboard({ children }) {
                   color="error"
                   variant="contained"
                   size="small"
-                  sx={{ height: 40 }}
+                  sx={{ 
+                    height: 40,
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    borderRadius: 2
+                  }}
                 >
                   Reset
                 </Button>
@@ -179,10 +278,16 @@ export default function Dashboard({ children }) {
               >
                 <Button
                   onClick={startRound}
-                  disabled={isTraining || !canStart || !isGameOver}
+                  disabled={isTraining || !canStart}
                   color="success"
                   size="small"
-                  sx={{ height: 40 }}
+                  sx={{ 
+                    height: 40,
+                    minWidth: 120,
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    borderRadius: 2
+                  }}
                 >
                   {isAI ? "Start AI Round" : "Start Round"}
                 </Button>
@@ -191,7 +296,12 @@ export default function Dashboard({ children }) {
                   disabled={!canPause}
                   color="warning"
                   size="small"
-                  sx={{ height: 40 }}
+                  sx={{ 
+                    height: 40,
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    borderRadius: 2
+                  }}
                 >
                   Pause
                 </Button>
@@ -200,7 +310,12 @@ export default function Dashboard({ children }) {
                   disabled={!canReset}
                   color="error"
                   size="small"
-                  sx={{ height: 40 }}
+                  sx={{ 
+                    height: 40,
+                    fontWeight: 600,
+                    textTransform: 'none',
+                    borderRadius: 2
+                  }}
                 >
                   Reset
                 </Button>
@@ -248,11 +363,27 @@ export default function Dashboard({ children }) {
             )}
             <TextField
               size="small"
-              label="Speed"
+              label="Speed (ms)"
               value={speed}
-              onChange={(e) => setSpeed(e.target.value)}
-              sx={{ width: 70, height: 40, opacity: 0.5 }}
-              disabled
+              onChange={(e) => {
+                const newSpeed = e.target.value;
+                setSpeedState(newSpeed);
+                const speedNum = parseInt(newSpeed);
+                if (!isNaN(speedNum) && speedNum >= 10 && speedNum <= 1000) {
+                  setSpeed(speedNum);
+                }
+              }}
+              sx={{ 
+                width: 90, 
+                height: 40,
+                '& .MuiInputBase-input': {
+                  fontFamily: 'monospace',
+                  fontSize: '0.875rem'
+                }
+              }}
+              type="number"
+              inputProps={{ min: 10, max: 1000, step: 10 }}
+              helperText="10-1000ms"
             />
           </Stack>
         </Stack>
@@ -272,51 +403,78 @@ export default function Dashboard({ children }) {
 
       {/* Statistics Panel */}
       <Paper
-        elevation={2}
+        elevation={3}
         sx={{
-          p: 2,
-          borderRadius: 3,
+          p: 3,
+          borderRadius: 4,
           maxWidth: panelWidth,
           width: "100%",
           mx: "auto",
+          background: "linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)",
+          backdropFilter: "blur(10px)",
+          border: "1px solid rgba(0, 212, 255, 0.2)",
+          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3)"
         }}
       >
         <Stack
           direction="row"
-          spacing={2}
+          spacing={3}
           alignItems="center"
           justifyContent="space-between"
+          sx={{ flexWrap: "wrap", gap: 2 }}
         >
-          <Box>
-            <Typography variant="h6" color="primary.main" fontWeight="bold">
-              Score: {gameState.score}
+          <Box sx={{ textAlign: "center", minWidth: 100 }}>
+            <Typography 
+              variant="h4" 
+              color="primary.main" 
+              fontWeight="700"
+              sx={{ 
+                background: "linear-gradient(45deg, #00D4FF, #00FF88)",
+                backgroundClip: "text",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                mb: 0.5
+              }}
+            >
+              {gameState.score}
             </Typography>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="caption" color="text.secondary" fontWeight="600">
+              CURRENT SCORE
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
               Steps: {gameState.steps}
             </Typography>
           </Box>
-          <Box>
-            <Typography variant="h6" color="secondary.main" fontWeight="bold">
-              Best: {gameState.stats.best}
+          
+          <Box sx={{ textAlign: "center", minWidth: 100 }}>
+            <Typography variant="h5" color="secondary.main" fontWeight="700" sx={{ mb: 0.5 }}>
+              {gameState.stats.best}
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Avg: {Math.round(gameState.stats.avg)} | Last:{" "}
-              {gameState.stats.last}
+            <Typography variant="caption" color="text.secondary" fontWeight="600">
+              BEST SCORE
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              Avg: {Math.round(gameState.stats.avg)}
             </Typography>
           </Box>
-          <Box>
-            <Typography variant="h6" color="success.main" fontWeight="bold">
-              Epsilon: {gameState.stats.epsilon.toFixed(2)}
+          
+          <Box sx={{ textAlign: "center", minWidth: 100 }}>
+            <Typography variant="h5" color="success.main" fontWeight="700" sx={{ mb: 0.5 }}>
+              {gameState.stats.epsilon.toFixed(2)}
             </Typography>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="caption" color="text.secondary" fontWeight="600">
+              EPSILON
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
               Decay: 0.995
             </Typography>
           </Box>
-          <Box>
-            <Typography variant="h6" color="info.main" fontWeight="bold">
+          
+          <Box sx={{ textAlign: "center", minWidth: 200 }}>
+            <Typography variant="body1" color="info.main" fontWeight="700" sx={{ mb: 1 }}>
               Recent Scores
             </Typography>
-            <Stack direction="row" spacing={1}>
+            <Stack direction="row" spacing={1} justifyContent="center" sx={{ flexWrap: "wrap", gap: 1 }}>
               {gameState.stats.all_scores
                 .slice(-6)
                 .reverse()
@@ -328,11 +486,16 @@ export default function Dashboard({ children }) {
                       score > 10 ? "success" : score > 5 ? "warning" : "error"
                     }
                     size="small"
-                    variant="outlined"
+                    variant="filled"
+                    sx={{
+                      fontWeight: 600,
+                      minWidth: 35,
+                      boxShadow: "0 2px 8px rgba(0, 0, 0, 0.2)"
+                    }}
                   />
                 ))}
               {gameState.stats.all_scores.length === 0 && (
-                <Typography color="gray.400" variant="body2">
+                <Typography color="text.secondary" variant="body2" sx={{ fontStyle: "italic" }}>
                   No scores yet
                 </Typography>
               )}
@@ -341,25 +504,114 @@ export default function Dashboard({ children }) {
         </Stack>
       </Paper>
 
-      {/* Save/Evaluate Buttons */}
-      <Stack
-        direction="row"
-        spacing={2}
-        width={panelWidth}
-        justifyContent="center"
-        mx="auto"
+      {/* Model Management Section */}
+      <Paper
+        elevation={3}
+        sx={{
+          p: 3,
+          borderRadius: 4,
+          maxWidth: panelWidth,
+          width: "100%",
+          mx: "auto",
+          background: "linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%)",
+          backdropFilter: "blur(10px)",
+          border: "1px solid rgba(0, 212, 255, 0.2)",
+          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3)"
+        }}
       >
-        <Button variant="outlined" color="info" onClick={saveModel}>
-          Save Model
-        </Button>
-        <Button
-          variant="outlined"
-          color="secondary"
-          onClick={() => evaluateModel(20)}
+        <Typography 
+          variant="h6" 
+          sx={{ 
+            mb: 2,
+            background: "linear-gradient(45deg, #00D4FF, #00FF88)",
+            backgroundClip: "text",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            fontWeight: 700
+          }}
         >
-          Evaluate AI
-        </Button>
-      </Stack>
+          AI Model Management
+        </Typography>
+        
+        <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+          <FormControl size="small" sx={{ minWidth: 200 }}>
+            <InputLabel>Select Model</InputLabel>
+            <Select
+              value={selectedModel}
+              label="Select Model"
+              onChange={(e) => setSelectedModel(e.target.value)}
+              sx={{ 
+                fontFamily: 'monospace',
+                fontSize: '0.875rem'
+              }}
+            >
+              {availableModels.map((model) => (
+                <MenuItem key={model} value={model} sx={{ fontFamily: 'monospace' }}>
+                  {model}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          
+          <Button 
+            variant="outlined" 
+            color="secondary"
+            onClick={() => selectedModel && loadModel(selectedModel)}
+            disabled={!selectedModel || !isConnected}
+            sx={{
+              fontWeight: 600,
+              textTransform: 'none',
+              borderRadius: 2
+            }}
+          >
+            Load Model
+          </Button>
+          
+          <Button 
+            variant="outlined" 
+            color="info"
+            onClick={listModels}
+            disabled={!isConnected}
+            sx={{
+              fontWeight: 600,
+              textTransform: 'none',
+              borderRadius: 2
+            }}
+          >
+            Refresh
+          </Button>
+        </Stack>
+        
+        <Stack direction="row" spacing={2} justifyContent="center">
+          <Button 
+            variant="contained" 
+            color="info" 
+            onClick={saveModel}
+            disabled={!isConnected}
+            sx={{
+              fontWeight: 600,
+              textTransform: 'none',
+              borderRadius: 2
+            }}
+          >
+            Save Current Model
+          </Button>
+          
+          <Button
+            variant="contained"
+            color="secondary"
+            onClick={() => evaluateModel(20)}
+            disabled={!isConnected}
+            sx={{
+              fontWeight: 600,
+              textTransform: 'none',
+              borderRadius: 2
+            }}
+          >
+            Evaluate AI (20 games)
+          </Button>
+        </Stack>
+      </Paper>
       {/* Show evaluation result */}
       {evaluationResult && (
         <Alert severity="info" sx={{ mt: 2, width: panelWidth, mx: "auto" }}>
@@ -398,6 +650,32 @@ export default function Dashboard({ children }) {
           {evaluationResult?.avg_score?.toFixed(2)}
         </MuiAlert>
       </Snackbar>
+      
+      {/* Snackbar for model loading */}
+      <Snackbar
+        open={openLoadSnackbar}
+        autoHideDuration={4000}
+        onClose={() => setOpenLoadSnackbar(false)}
+      >
+        <MuiAlert
+          elevation={6}
+          variant="filled"
+          severity={modelLoadInfo?.success ? "success" : "error"}
+          sx={{ width: panelWidth }}
+        >
+          {modelLoadInfo?.success 
+            ? `Model ${modelLoadInfo?.filename} loaded successfully!`
+            : `Failed to load model: ${modelLoadInfo?.error || 'Unknown error'}`
+          }
+        </MuiAlert>
+      </Snackbar>
+      
+      {/* Training Visualization */}
+      {(gameState.training || gameState.stats?.all_scores?.length > 0) && (
+        <Box sx={{ width: "100%", mt: 3 }}>
+          <TrainingCharts gameState={gameState} />
+        </Box>
+      )}
     </Stack>
   );
 }
