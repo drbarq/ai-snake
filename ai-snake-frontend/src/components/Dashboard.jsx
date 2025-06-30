@@ -449,12 +449,16 @@ export default function Dashboard({ children }) {
                 sx={{ 
                   fontSize: '0.7rem',
                   fontStyle: 'italic',
-                  maxWidth: 80,
+                  maxWidth: 90,
                   textAlign: 'center',
-                  lineHeight: 1.2
+                  lineHeight: 1.2,
+                  padding: '2px 6px',
+                  backgroundColor: 'rgba(255, 152, 0, 0.1)',
+                  borderRadius: 1,
+                  border: '1px solid rgba(255, 152, 0, 0.3)'
                 }}
               >
-                Grid locked during gameplay
+                🔒 Grid locked
               </Typography>
             )}
             {!isTraining && (

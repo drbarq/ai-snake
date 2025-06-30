@@ -3,7 +3,7 @@ import { Box, Typography, Paper, LinearProgress, Stack } from "@mui/material";
 import { useGame } from "../contexts/GameContext";
 
 export default function GameBoard() {
-  const { gameState, sendDirection } = useGame();
+  const { gameState, sendDirection, resetGame } = useGame();
   const [showCompletionCelebration, setShowCompletionCelebration] = useState(false);
   
   // Check for training completion
@@ -22,7 +22,16 @@ export default function GameBoard() {
   // Keyboard controls for manual mode
   useEffect(() => {
     const handleKeyPress = (event) => {
-      if (gameState.mode !== "manual") return;
+      // Handle spacebar restart in manual mode
+      if (event.key === " " || event.code === "Space") {
+        if (gameState.mode === "manual" && gameState.game_over) {
+          event.preventDefault();
+          resetGame();
+          return;
+        }
+      }
+      
+      if (gameState.mode !== "manual" || gameState.game_over) return;
 
       switch (event.key) {
         case "ArrowUp":
@@ -49,6 +58,10 @@ export default function GameBoard() {
           event.preventDefault();
           sendDirection("RIGHT");
           break;
+        case "Escape":
+          event.preventDefault();
+          // Could add pause functionality here
+          break;
         default:
           break;
       }
@@ -56,7 +69,7 @@ export default function GameBoard() {
 
     window.addEventListener("keydown", handleKeyPress);
     return () => window.removeEventListener("keydown", handleKeyPress);
-  }, [gameState.mode, sendDirection]);
+  }, [gameState.mode, gameState.game_over, sendDirection, resetGame]);
 
   const renderSnake = () => {
     return gameState.snake.map((segment, index) => (
@@ -249,7 +262,7 @@ export default function GameBoard() {
             <Typography variant="body1" color="gray.300">
               {gameState.mode === "ai"
                 ? "Click 'START AI ROUND' to watch another AI game"
-                : "Click 'START ROUND' to play again"}
+                : "Click 'START ROUND' or press SPACEBAR to play again"}
             </Typography>
           </Box>
         )}
@@ -310,7 +323,7 @@ export default function GameBoard() {
             display="block"
             mt={0.5}
           >
-            Use WASD or Arrow Keys
+            Use WASD or Arrow Keys{gameState.game_over ? " | SPACEBAR to restart" : ""}
           </Typography>
         )}
         {gameState.mode === "ai" && (
