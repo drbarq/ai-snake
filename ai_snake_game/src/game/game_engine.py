@@ -3,6 +3,16 @@ from .snake import Snake, Direction
 from .food import Food
 
 
+class RewardConfig:
+    """Configuration for reward values."""
+    def __init__(self, death_penalty: float = -10.0, food_reward: float = 10.0, 
+                 step_penalty: float = -0.1, win_reward: float = 100.0):
+        self.death_penalty = death_penalty
+        self.food_reward = food_reward
+        self.step_penalty = step_penalty
+        self.win_reward = win_reward
+
+
 class GameEngine:
     """
     Main game controller managing game state and flow.
@@ -23,11 +33,12 @@ class GameEngine:
     - game_over: Boolean game state
     """
 
-    def __init__(self, width: int, height: int, cell_size: int):
-        """Initialize game engine with grid dimensions."""
+    def __init__(self, width: int, height: int, cell_size: int, reward_config: Optional[RewardConfig] = None):
+        """Initialize game engine with grid dimensions and reward configuration."""
         self.grid_width = width
         self.grid_height = height
         self.cell_size = cell_size
+        self.reward_config = reward_config or RewardConfig()
         
         # Game state
         self.score = 0
@@ -62,14 +73,14 @@ class GameEngine:
         # Check for collisions
         if self.snake.check_collision(self.grid_width, self.grid_height):
             self.game_over = True
-            return -10.0  # Death penalty
+            return self.reward_config.death_penalty
 
         # Check for food consumption
         reward = 0.0
         if self.food.is_eaten(self.snake.head):
             self.snake.grow()
             self.score += 1
-            reward = 10.0  # Food reward
+            reward = self.reward_config.food_reward
             
             # Generate new food
             try:
@@ -77,10 +88,10 @@ class GameEngine:
             except ValueError:
                 # Game won - no more space for food
                 self.game_over = True
-                reward = 100.0  # Win reward
+                reward = self.reward_config.win_reward
         else:
             # Small penalty for each step to encourage efficiency
-            reward = -0.1
+            reward = self.reward_config.step_penalty
 
         return reward
 

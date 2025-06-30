@@ -19,6 +19,7 @@ import {
 import MuiAlert from "@mui/material/Alert";
 import { useGame } from "../contexts/GameContext";
 import TrainingCharts from "./TrainingCharts";
+import ModelSettings from "./ModelSettings";
 
 export default function Dashboard({ children }) {
   const {
@@ -780,6 +781,11 @@ export default function Dashboard({ children }) {
           }
         </MuiAlert>
       </Snackbar>
+      
+      {/* Model Settings */}
+      <Box sx={{ width: "100%", maxWidth: panelWidth, mx: "auto", mt: 3 }}>
+        <ModelSettings />
+      </Box>
       
       {/* Training Visualization */}
       {(gameState.training || gameState.stats?.all_scores?.length > 0) && (

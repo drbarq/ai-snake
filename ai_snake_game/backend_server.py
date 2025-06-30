@@ -11,9 +11,11 @@ pip install fastapi uvicorn websockets
 """
 import asyncio
 import json
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from src.game.game_engine import GameEngine
+from pydantic import BaseModel
+from typing import List, Dict, Any
+from src.game.game_engine import GameEngine, RewardConfig as GameRewardConfig
 from src.ai.agent import DQNAgent
 
 app = FastAPI()
@@ -33,7 +35,7 @@ clients = set()
 GRID_W, GRID_H, CELL_SIZE = 15, 17, 20
 DEFAULT_TRAINING_ROUNDS = 100
 
-game_engine = GameEngine(GRID_W, GRID_H, CELL_SIZE)
+game_engine = None  # Will be initialized after configuration is defined
 agent_config = {
     'state_size': 11,
     'action_size': 4,
@@ -67,6 +69,164 @@ game_speed = 100  # Default speed (milliseconds between moves)
 training_losses = []  # Track training losses
 episode_steps = []  # Track steps per episode
 win_rate_history = []  # Track win rate over time
+
+# --- Pydantic Models for Configuration ---
+
+class RewardConfig(BaseModel):
+    death_penalty: float = -10.0
+    food_reward: float = 10.0
+    step_penalty: float = -0.1
+    win_reward: float = 100.0
+
+class NetworkConfig(BaseModel):
+    type: str = "FeatureDQN"  # GridDQN, FeatureDQN, VisionDQN, HybridDQN
+    hidden_layers: List[int] = [256, 128]
+    activation: str = "relu"
+
+class TrainingConfig(BaseModel):
+    learning_rate: float = 0.001
+    batch_size: int = 32
+    memory_size: int = 50000
+    epsilon_start: float = 1.0
+    epsilon_end: float = 0.01
+    epsilon_decay: float = 0.995
+    target_update_frequency: int = 1000
+
+class FeatureConfig(BaseModel):
+    danger_detection: bool = True
+    food_vector: bool = True
+    wall_distances: bool = True
+    body_awareness: bool = True
+    movement_state: bool = True
+
+class VisionConfig(BaseModel):
+    ray_count: int = 8
+    ray_length: int = 10
+    detect_walls: bool = True
+    detect_body: bool = True
+    detect_food: bool = True
+
+class ModelConfiguration(BaseModel):
+    rewards: RewardConfig = RewardConfig()
+    network: NetworkConfig = NetworkConfig()
+    training: TrainingConfig = TrainingConfig()
+    features: FeatureConfig = FeatureConfig()
+    vision: VisionConfig = VisionConfig()
+
+# Global configuration state
+current_config = ModelConfiguration()
+
+def create_reward_config_from_current():
+    """Create GameRewardConfig from current API config"""
+    return GameRewardConfig(
+        death_penalty=current_config.rewards.death_penalty,
+        food_reward=current_config.rewards.food_reward,
+        step_penalty=current_config.rewards.step_penalty,
+        win_reward=current_config.rewards.win_reward
+    )
+
+def initialize_game_engine():
+    """Initialize game engine with current configuration"""
+    global game_engine
+    game_engine = GameEngine(GRID_W, GRID_H, CELL_SIZE, create_reward_config_from_current())
+
+# Initialize game engine with default configuration
+initialize_game_engine()
+
+# --- Configuration API Endpoints ---
+
+@app.get("/api/config")
+async def get_configuration() -> ModelConfiguration:
+    """Get current model configuration"""
+    return current_config
+
+@app.post("/api/config")
+async def update_configuration(config: ModelConfiguration) -> Dict[str, str]:
+    """Update model configuration"""
+    global current_config, agent, game_engine, agent_config
+    
+    # Validate that training is not active
+    if training_mode and not training_paused:
+        raise HTTPException(
+            status_code=400, 
+            detail="Cannot update configuration while training is active. Please pause or stop training first."
+        )
+    
+    try:
+        # Update the global configuration
+        current_config = config
+        
+        # Update agent configuration
+        agent_config.update({
+            'learning_rate': config.training.learning_rate,
+            'batch_size': config.training.batch_size,
+            'memory_size': config.training.memory_size,
+            'epsilon_start': config.training.epsilon_start,
+            'epsilon_end': config.training.epsilon_end,
+            'epsilon_decay': config.training.epsilon_decay,
+            'target_update_frequency': config.training.target_update_frequency,
+            'hidden_layers': config.network.hidden_layers,
+        })
+        
+        # Recreate agent with new configuration
+        state_size = 11  # This should be calculated based on enabled features
+        action_size = 4
+        agent = DQNAgent(state_size, action_size, agent_config)
+        
+        # Recreate game engine with new reward configuration
+        initialize_game_engine()
+        
+        print(f"Configuration updated successfully")
+        print(f"Network type: {config.network.type}")
+        print(f"Hidden layers: {config.network.hidden_layers}")
+        print(f"Learning rate: {config.training.learning_rate}")
+        print(f"Rewards: Death={config.rewards.death_penalty}, Food={config.rewards.food_reward}")
+        
+        return {"status": "success", "message": "Configuration updated successfully"}
+        
+    except Exception as e:
+        print(f"Error updating configuration: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update configuration: {str(e)}")
+
+@app.get("/api/config/rewards")
+async def get_reward_config() -> RewardConfig:
+    """Get current reward configuration"""
+    return current_config.rewards
+
+@app.post("/api/config/rewards")
+async def update_reward_config(rewards: RewardConfig) -> Dict[str, str]:
+    """Update reward configuration"""
+    global current_config
+    
+    if training_mode and not training_paused:
+        raise HTTPException(
+            status_code=400, 
+            detail="Cannot update rewards while training is active"
+        )
+    
+    current_config.rewards = rewards
+    # Recreate game engine with new reward configuration
+    initialize_game_engine()
+    print(f"Rewards updated: {rewards}")
+    return {"status": "success", "message": "Reward configuration updated"}
+
+@app.get("/api/config/presets")
+async def get_configuration_presets() -> Dict[str, ModelConfiguration]:
+    """Get predefined configuration presets"""
+    return {
+        "default": ModelConfiguration(),
+        "aggressive": ModelConfiguration(
+            rewards=RewardConfig(death_penalty=-20.0, food_reward=15.0, step_penalty=-0.2),
+            training=TrainingConfig(learning_rate=0.002, epsilon_decay=0.99)
+        ),
+        "conservative": ModelConfiguration(
+            rewards=RewardConfig(death_penalty=-5.0, food_reward=5.0, step_penalty=-0.05),
+            training=TrainingConfig(learning_rate=0.0005, epsilon_decay=0.998)
+        ),
+        "exploration": ModelConfiguration(
+            training=TrainingConfig(epsilon_start=1.0, epsilon_end=0.1, epsilon_decay=0.999)
+        )
+    }
 
 # --- Game State Serialization ---
 
