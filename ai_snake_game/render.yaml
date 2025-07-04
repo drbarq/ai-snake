@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: ai-snake-game-backend
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend_server:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0

@@ -34,6 +34,11 @@ app.add_middleware(
 async def health_check():
     return {"status": "ok", "message": "AI Snake Game Backend is running"}
 
+# Root endpoint for Render health checks
+@app.get("/")
+async def root():
+    return {"message": "AI Snake Game Backend API", "status": "running", "docs": "/docs"}
+
 clients = set()
 
 # --- Game Setup ---
