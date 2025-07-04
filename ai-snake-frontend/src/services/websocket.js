@@ -18,7 +18,9 @@ class WebSocketService {
     
     try {
       this.isConnecting = true;
-      this.ws = new WebSocket("ws://127.0.0.1:8000/ws");
+      // Use environment variable for WebSocket URL, fallback to localhost for development
+      const wsUrl = import.meta.env.VITE_WS_URL || "ws://127.0.0.1:8000/ws";
+      this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
         console.log("WebSocket connected");
