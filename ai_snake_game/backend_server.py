@@ -29,6 +29,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Health check endpoint for Railway
+@app.get("/health")
+async def health_check():
+    return {"status": "ok", "message": "AI Snake Game Backend is running"}
+
 clients = set()
 
 # --- Game Setup ---
