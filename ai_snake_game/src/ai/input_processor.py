@@ -142,12 +142,16 @@ class InputProcessor:
 
         for dx, dy in directions:
             distance = float('inf')
-            for i in range(1, min(10, len(body_positions))):  # Check first 10 segments
-                body_x, body_y = body_positions[i-1]
-                if (body_x - head_x) * dx > 0 and (body_y - head_y) * dy > 0:
-                    # Body segment is in this direction
-                    dist = abs(body_x - head_x) + abs(body_y - head_y)
-                    distance = min(distance, dist)
+            for i in range(min(10, len(body_positions))):  # Check first 10 segments
+                body_x, body_y = body_positions[i]
+                if dx == 0:
+                    if body_x == head_x and (body_y - head_y) * dy > 0:
+                        dist = abs(body_y - head_y)
+                        distance = min(distance, dist)
+                else:
+                    if body_y == head_y and (body_x - head_x) * dx > 0:
+                        dist = abs(body_x - head_x)
+                        distance = min(distance, dist)
             
             if distance == float('inf'):
                 distance = 10.0  # No body segment in this direction
